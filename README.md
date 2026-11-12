@@ -4,7 +4,7 @@ Money movement with a ledger you can prove: accounts, deposits, withdrawals and
 transfers where the books always balance, the same request never pays twice,
 and every posting and refused attempt is on an append-only record.
 
-- **Live site:** _add the Render URL here after deploying_
+- **Live site: [snova.onrender.com](https://snova.onrender.com/)**
 - **Demo video:** _not recorded yet_
 - **Threat model:** [THREATS.md](THREATS.md)
 - **API reference:** [docs/API.md](docs/API.md)
@@ -12,12 +12,12 @@ and every posting and refused attempt is on an append-only record.
 
 ## Demo logins
 
-| Role | Username | Password | What they can do |
-|------|----------|----------|------------------|
-| Administrator | `admin` | `Admin#Ledger1` | Create users, open accounts for holders, deposit into any account, make adjustments (reason required), freeze accounts, see everything. Cannot withdraw or transfer customers' money. |
-| Account holder | `alice` | `Alice#Ledger1` | Owns account **1001**. Deposit, withdraw and transfer from her own accounts only. |
-| Account holder | `bob` | `Bob#Ledger1` | Owns account **1002**. Same as alice, for his accounts. |
-| Auditor | `auditor` | `Audit#Ledger1` | Read-only: every account, statement, transaction and audit event, the integrity check and the flags. Cannot change anything. |
+| Role           | Username    | Password          | What they can do                                                                                                                                                                      |
+| -------------- | ----------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Administrator  | `admin`   | `Admin#Ledger1` | Create users, open accounts for holders, deposit into any account, make adjustments (reason required), freeze accounts, see everything. Cannot withdraw or transfer customers' money. |
+| Account holder | `alice`   | `Alice#Ledger1` | Owns account **1001**. Deposit, withdraw and transfer from her own accounts only.                                                                                               |
+| Account holder | `bob`     | `Bob#Ledger1`   | Owns account **1002**. Same as alice, for his accounts.                                                                                                                         |
+| Auditor        | `auditor` | `Audit#Ledger1` | Read-only: every account, statement, transaction and audit event, the integrity check and the flags. Cannot change anything.                                                          |
 
 You can also register a new account holder from the login page.
 
@@ -25,7 +25,7 @@ The free host sleeps when idle: the first request can take up to a minute.
 
 ## Run it on your machine
 
-Needs **Node.js 22 or newer**. No database install is needed.
+Needs **Node.js 24** (the version the tests were run on; 22 or newer should work). No database install is needed.
 
 ```bash
 git clone <this repository>
@@ -61,19 +61,30 @@ npm test
 real HTTP requests, including concurrent ones. Set `DATABASE_URL` first to run
 them against your own (empty, disposable) database instead.
 
+### Attack a running deployment
+
+```bash
+node scripts/live-check.js https://snova.onrender.com
+```
+
+Fires simultaneous withdrawals, replays one transfer nine times, tries to move
+another user's money, then runs the auditor's verification. Prints PASS/FAIL
+for each. It registers two throw-away users on the target.
+
 ### Other commands
 
-| Command | What it does |
-|---------|--------------|
-| `npm run migrate` | Applies [db/schema.sql](db/schema.sql). Safe to repeat. |
-| `npm run seed` | Creates the demo users and accounts if missing. Safe to repeat. |
-| `npm start` | Starts the server (also migrates and seeds; both are idempotent). |
+| Command             | What it does                                                      |
+| ------------------- | ----------------------------------------------------------------- |
+| `npm run migrate` | Applies [db/schema.sql](db/schema.sql). Safe to repeat.            |
+| `npm run seed`    | Creates the demo users and accounts if missing. Safe to repeat.   |
+| `npm start`       | Starts the server (also migrates and seeds; both are idempotent). |
 
 ## Deploy (Render + Neon, both free, no card)
 
 1. **Database.** Create a project at neon.tech. On the project dashboard press
-   **Connect**, switch **Connection pooling off**, and copy the connection
-   string (it starts with `postgresql://`).
+   **Connect**, choose **Connection string** (not `psql`), switch **Connection
+   pooling off**, and copy only the URL that starts with `postgresql://` -
+   no `psql`, no quotes.
 2. **Web service.** At render.com choose **New > Web Service**, connect this
    GitHub repository, and set:
    - Build command: `npm install`

@@ -35,7 +35,7 @@ health endpoint and JSON error handling.
   version (`18.6.0-beta.19`). It is a dev dependency only (not used on the
   deployed server), but it is not a stable release.
 
-**Commit:** `"Project skeleton: Express server, Postgres pool, health check"`
+**Commit:** [`e80275c`](https://github.com/apsahasra/snova/commit/e80275c) - Project skeleton: Express server, Postgres pool, health check
 
 ---
 
@@ -74,7 +74,7 @@ login / logout / me endpoints, and 8 tests.
   SQL, not read from the request body; there is a test that sends
   `role: "admin"` and checks the stored role.
 
-**Commit:** `Authentication: scrypt passwords, server-side sessions, role middleware, tests`
+**Commit:** [`fdab0d1`](https://github.com/apsahasra/snova/commit/fdab0d1) - Authentication: scrypt passwords, server-side sessions, role middleware, tests
 
 ---
 
@@ -127,7 +127,7 @@ lock or one check and re-run the tests. So that was done here, one at a time:
    is the kind I cannot explain in an interview. Changed to `requireLogin` on
    each of the three routes explicitly.
 
-**Commit:** "Ledger engine: accounts, deposit/withdraw/transfer with row locks, policy module, race tests
+**Commit:** [`86e2ba4`](https://github.com/apsahasra/snova/commit/86e2ba4) - Ledger engine: accounts, deposit/withdraw/transfer with row locks, policy module, race tests
 
 ---
 
@@ -175,4 +175,50 @@ do not stop the database *owner*, who can disable a trigger. The hash chain is
 for that case: the test disables the trigger, edits an amount, and checks that
 `/api/audit/verify` reports the exact entry. It detects, it does not prevent.
 
-**Commit:** "Statements, ledger verification with hash chain, admin and auditor endpoints, tests"
+**Commit:** [`a6c8e17`](https://github.com/apsahasra/snova/commit/a6c8e17) - Statements, ledger verification with hash chain, admin and auditor endpoints, tests
+
+---
+
+## Entry 5 - 2026-11-12 - Deployment (Render + Neon) and attacking the live site
+
+**What I asked for.** Deploy to a free host and check that the deployed
+system, not just my laptop, holds up.
+
+**What the tool produced.** `render.yaml`, deployment steps, and
+`scripts/live-check.js`, which attacks a running URL (12 simultaneous
+withdrawals, the same transfer sent 9 times, cross-user theft, bad amounts)
+and finishes by running the auditor's ledger verification.
+
+**What was wrong / rejected.**
+
+1. *Rejected an AI-generated setup prompt.* Neon's onboarding offered a
+   ready-made prompt for a coding agent: install a global `neon` CLI, run
+   `neon init`, write the connection strings to `.env.local`, and "use them
+   in my app's code following the installed Neon agent skills". I asked the
+   tool whether to run it and it said no, and I agree: the app reads exactly
+   one variable, `DATABASE_URL`, from the host's environment; it does not read
+   `.env.local`; and letting a second tool edit the database code of a ledger
+   I have to explain line by line is the opposite of what I want. Copied the
+   connection string into Render's environment settings by hand instead.
+2. *First deploy crashed: `getaddrinfo ENOTFOUND base`.* The build passed and
+   the server died in `migrate()`. `base` is not in my code or in Neon's host
+   name. The tool recognised it as the placeholder host the `pg` library uses
+   when the connection string is not a complete URL - so the `DATABASE_URL`
+   value in Render was malformed, not the code. I corrected the value in
+   Render and the next deploy went live. The tool's deployment steps had said
+   "copy the connection string" without warning that Neon's dialog can show it
+   wrapped in a `psql '...'` command; the README step now says to pick the
+   bare `postgresql://` URL.
+3. *The Node version was left open-ended.* The tool had written
+   `"engines": { "node": ">=22" }`. Render read that and installed **Node
+   26.13.1** - a major version neither of us had run the tests on (they run on
+   Node 24 locally). It worked, but "the newest thing that exists on the day
+   of the deploy" is not a version I chose. Pinned `engines.node` to `24.x`,
+   the version the 43 tests pass on.
+
+**Result on the live site** (`node scripts/live-check.js https://snova.onrender.com`):
+9 of 9 checks pass - exactly 4 of 12 racing withdrawals succeed, the transfer
+sent 9 times is paid once, both theft attempts are refused and appear on the
+victim's statement, and verification reports the sum of all balances as 0.
+
+**Commit:** _(fill in the hash of the "live check" commit)_
