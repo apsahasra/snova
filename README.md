@@ -5,7 +5,7 @@ transfers where the books always balance, the same request never pays twice,
 and every posting and refused attempt is on an append-only record.
 
 - **Live site: [snova.onrender.com](https://snova.onrender.com/)**
-- **Demo video:** _not recorded yet_
+- **Demo video:** [drive.google.com/file/d/1o1NleSeJwQi_cTlL1LUG555UJtidmu1t/view?usp=sharing](https://drive.google.com/file/d/1o1NleSeJwQi_cTlL1LUG555UJtidmu1t/view?usp=sharing)
 - **Threat model:** [THREATS.md](THREATS.md)
 - **API reference:** [docs/API.md](docs/API.md)
 - **How AI was used:** [PROMPTS.md](PROMPTS.md)

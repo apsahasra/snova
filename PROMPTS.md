@@ -221,4 +221,4 @@ and finishes by running the auditor's ledger verification.
 sent 9 times is paid once, both theft attempts are refused and appear on the
 victim's statement, and verification reports the sum of all balances as 0.
 
-**Commit:** _(fill in the hash of the "live check" commit)_
+**Commit:** "Live attack script, deployment notes, PROMPTS entry 5 with commit links"

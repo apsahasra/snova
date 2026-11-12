@@ -11,6 +11,7 @@
 // Because the rows are locked before the balance is read, a second request for
 // the same account waits at step 1 until the first has committed, and then
 // sees the new balance. Two racing withdrawals cannot both "see enough".
+
 import { withTransaction } from '../db.js';
 import { config } from '../config.js';
 import { notFound } from '../errors.js';

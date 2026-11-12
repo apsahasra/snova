@@ -12,6 +12,7 @@
 // `user` is always req.user, which the login middleware loaded from the
 // database - never something the client sent.
 
+
 const owns = (user, account) => account.kind === 'customer' && account.owner_id === user.id;
 
 export function canViewAccount(user, account) {
