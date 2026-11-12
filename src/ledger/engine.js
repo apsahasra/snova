@@ -5,7 +5,8 @@
 //   2. decides: allowed? frozen? enough money?
 //   3. either posts it (two balance updates + a debit entry + a credit entry)
 //      or records it as a refused attempt (no balance change),
-//   4. commits. If anything throws, everything is rolled back.
+//   4. stores the answer under the request's idempotency key,
+//   5. commits. If anything throws, everything is rolled back.
 //
 // Because the rows are locked before the balance is read, a second request for
 // the same account waits at step 1 until the first has committed, and then
@@ -15,6 +16,7 @@ import { config } from '../config.js';
 import { notFound } from '../errors.js';
 import { canMoveMoney, canViewAccount } from '../policy.js';
 import { entryHash, GENESIS_HASH } from './hash.js';
+import { claimKey, requestHash, saveResult } from './idempotency.js';
 
 export const EXTERNAL_ACCOUNT_ID = 1000;
 
@@ -82,45 +84,60 @@ async function changeBalance(client, accountId, delta) {
 
 // Moves `amount` paise from account `fromId` to account `toId` on behalf of `user`.
 // Returns { status, body } - the HTTP status and JSON body to send.
-export async function moveMoney({ user, type, fromId, toId, amount, memo, idempotencyKey }) {
+// A duplicate request (same user, same Idempotency-Key) gets the stored answer
+// of the first one and moves nothing.
+export async function moveMoney(request) {
+  const { user, idempotencyKey } = request;
   return withTransaction(async (client) => {
-    const { from, to } = await lockAccounts(client, fromId, toId);
-    const refusal = decide(user, type, from, to, amount);
+    const duplicate = await claimKey(client, user.id, idempotencyKey, requestHash(request));
+    if (duplicate) return duplicate;
 
-    const inserted = await client.query(
-      `INSERT INTO transactions
-         (type, status, amount, from_account_id, to_account_id, initiated_by, refusal_reason, memo, idempotency_key)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING id, type, status, amount, from_account_id, to_account_id, initiated_by, refusal_reason, memo, created_at`,
-      [type, refusal ? 'refused' : 'posted', amount, fromId, toId, user.id, refusal, memo, idempotencyKey],
-    );
-    const tx = inserted.rows[0];
-
-    // The customer account this request was aimed at. A refused attempt is
-    // written on its statement, and its new balance is what we report back.
-    const subject = from.kind === 'customer' ? from : to;
-    let subjectBalance = subject.balance;
-
-    if (refusal) {
-      const direction = subject === from ? 'debit' : 'credit';
-      await insertEntry(client, tx, subject.id, direction, 'refused', subject.balance);
-    } else {
-      const fromBalance = await changeBalance(client, from.id, -amount);
-      const toBalance = await changeBalance(client, to.id, amount);
-      await insertEntry(client, tx, from.id, 'debit', 'posted', fromBalance);
-      await insertEntry(client, tx, to.id, 'credit', 'posted', toBalance);
-      subjectBalance = subject === from ? fromBalance : toBalance;
-    }
-
-    const body = { transaction: tx };
-    // Only tell the caller a balance they are allowed to see anyway.
-    if (canViewAccount(user, subject)) body.balance_after = subjectBalance;
-
-    if (refusal) {
-      body.error = refusal;
-      body.message = REFUSALS[refusal].message;
-      return { status: REFUSALS[refusal].http, body };
-    }
-    return { status: 201, body };
+    const result = await postMovement(client, request);
+    // Round-trip through JSON so the first answer and every replay are identical.
+    result.body = JSON.parse(JSON.stringify(result.body));
+    await saveResult(client, user.id, idempotencyKey, result);
+    return result;
   });
+}
+
+// Does the actual movement. Runs inside the open database transaction.
+async function postMovement(client, { user, type, fromId, toId, amount, memo, idempotencyKey }) {
+  const { from, to } = await lockAccounts(client, fromId, toId);
+  const refusal = decide(user, type, from, to, amount);
+
+  const inserted = await client.query(
+    `INSERT INTO transactions
+       (type, status, amount, from_account_id, to_account_id, initiated_by, refusal_reason, memo, idempotency_key)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     RETURNING id, type, status, amount, from_account_id, to_account_id, initiated_by, refusal_reason, memo, created_at`,
+    [type, refusal ? 'refused' : 'posted', amount, fromId, toId, user.id, refusal, memo, idempotencyKey],
+  );
+  const tx = inserted.rows[0];
+
+  // The customer account this request was aimed at. A refused attempt is
+  // written on its statement, and its new balance is what we report back.
+  const subject = from.kind === 'customer' ? from : to;
+  let subjectBalance = subject.balance;
+
+  if (refusal) {
+    const direction = subject === from ? 'debit' : 'credit';
+    await insertEntry(client, tx, subject.id, direction, 'refused', subject.balance);
+  } else {
+    const fromBalance = await changeBalance(client, from.id, -amount);
+    const toBalance = await changeBalance(client, to.id, amount);
+    await insertEntry(client, tx, from.id, 'debit', 'posted', fromBalance);
+    await insertEntry(client, tx, to.id, 'credit', 'posted', toBalance);
+    subjectBalance = subject === from ? fromBalance : toBalance;
+  }
+
+  const body = { transaction: tx };
+  // Only tell the caller a balance they are allowed to see anyway.
+  if (canViewAccount(user, subject)) body.balance_after = subjectBalance;
+
+  if (refusal) {
+    body.error = refusal;
+    body.message = REFUSALS[refusal].message;
+    return { status: REFUSALS[refusal].http, body };
+  }
+  return { status: 201, body };
 }

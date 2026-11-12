@@ -21,6 +21,7 @@ async function move(req, res, type, fromId, toId) {
     memo: readText(req.body?.memo, 'memo'),
     idempotencyKey: readIdempotencyKey(req),
   });
+  if (result.replayed) res.set('Idempotent-Replay', 'true');
   res.status(result.status).json(result.body);
 }
 

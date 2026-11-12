@@ -91,10 +91,10 @@ or record a refusal), and 15 tests including races fired with `Promise.all`.
 **How it was checked.** The problem statement says the judges will remove one
 lock or one check and re-run the tests. So that was done here, one at a time:
 
-| Removed from `engine.js`            | Result |
-|-------------------------------------|--------|
-| `FOR UPDATE` (the row lock)         | 3 race tests fail |
-| the `insufficient_funds` check      | 4 tests fail |
+| Removed from `engine.js`                 | Result                     |
+| ------------------------------------------ | -------------------------- |
+| `FOR UPDATE` (the row lock)              | 3 race tests fail          |
+| the `insufficient_funds` check           | 4 tests fail               |
 | the `canMoveMoney` (authorisation) check | 4 authorisation tests fail |
 
 **What was wrong.**
@@ -127,4 +127,4 @@ lock or one check and re-run the tests. So that was done here, one at a time:
    is the kind I cannot explain in an interview. Changed to `requireLogin` on
    each of the three routes explicitly.
 
-**Commit:** _(fill in the hash of the "ledger engine" commit)_
+**Commit:** "Ledger engine: accounts, deposit/withdraw/transfer with row locks, policy module, race tests"
