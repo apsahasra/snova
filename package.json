@@ -12,7 +12,7 @@
     "dev": "node src/server.js",
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
-    "test": "node --test --test-concurrency=1 \"test/*.test.js\""
+    "test": "node scripts/test.js"
   },
   "dependencies": {
     "express": "^5.3.0",

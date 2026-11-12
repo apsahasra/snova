@@ -69,8 +69,22 @@ export async function resolveDatabaseUrl({ dataDir = '.pgdata', port = 54329 } =
   }
 
   const { default: EmbeddedPostgres } = await import('embedded-postgres');
-  const { existsSync } = await import('node:fs');
+  const { existsSync, readFileSync, rmSync } = await import('node:fs');
   const firstRun = !existsSync(`${dataDir}/PG_VERSION`);
+
+  // If an earlier run was killed, its Postgres process and lock file are still
+  // there and would block this start. Stop that process and remove the file.
+  const pidFile = `${dataDir}/postmaster.pid`;
+  if (existsSync(pidFile)) {
+    try {
+      // the first line of postmaster.pid is the process id
+      process.kill(parseInt(readFileSync(pidFile, 'utf8'), 10));
+    } catch {
+      // already gone
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    rmSync(pidFile, { force: true });
+  }
 
   embedded = new EmbeddedPostgres({
     databaseDir: dataDir,

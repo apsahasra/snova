@@ -35,7 +35,7 @@ health endpoint and JSON error handling.
   version (`18.6.0-beta.19`). It is a dev dependency only (not used on the
   deployed server), but it is not a stable release.
 
-**Commit:** _(fill in the hash of the "project skeleton" commit)_
+**Commit:** `"Project skeleton: Express server, Postgres pool, health check"`
 
 ---
 
@@ -74,4 +74,57 @@ login / logout / me endpoints, and 8 tests.
   SQL, not read from the request body; there is a test that sends
   `role: "admin"` and checks the stored role.
 
-**Commit:** _(fill in the hash of the "authentication" commit)_
+**Commit:** `Authentication: scrypt passwords, server-side sessions, role middleware, tests`
+
+---
+
+## Entry 3 - 2026-11-12 - The ledger engine, row locks, and checking that the tests really test them (access control + concurrency)
+
+**What I asked for.** Accounts, deposit / withdraw / transfer, with per-account
+authorisation decided on the server and safety under concurrent requests.
+
+**What the tool produced.** `src/policy.js` (every authorisation decision in
+one file), `src/ledger/engine.js` (one database transaction per movement:
+lock both account rows with `SELECT ... FOR UPDATE` in id order, decide, post
+or record a refusal), and 15 tests including races fired with `Promise.all`.
+
+**How it was checked.** The problem statement says the judges will remove one
+lock or one check and re-run the tests. So that was done here, one at a time:
+
+| Removed from `engine.js`            | Result |
+|-------------------------------------|--------|
+| `FOR UPDATE` (the row lock)         | 3 race tests fail |
+| the `insufficient_funds` check      | 4 tests fail |
+| the `canMoveMoney` (authorisation) check | 4 authorisation tests fail |
+
+**What was wrong.**
+
+1. *One race test does not detect the missing lock.* With `FOR UPDATE`
+   removed, "20 simultaneous withdrawals of 100 from 1000" still passed. The
+   other race tests caught it, but that test alone would have given false
+   confidence. I have not pinned down exactly why that one run passed (it was
+   run once; timing decides whether the reads overlap). Kept the test, but it
+   is not the one that proves the lock - the "two withdrawals of the full
+   balance, 20 rounds" test is, and it failed immediately.
+2. *A failed check could hang the whole test run.* The `after()` hook ran
+   `assertBooksBalance()` and then stopped the server. If the assertion threw,
+   the server was never stopped and the run never exited. Fixed with
+   `try { ... } finally { stopTestServer() }`.
+3. *The embedded test database was started and stopped once per test file.*
+   On Windows the Postgres process does not always exit fully before the next
+   file starts, and a killed run left a half-dead `postgres.exe` plus a
+   `postmaster.pid` that blocked every later run (all tests failing in the
+   `before` hook after 10 s). The tool's first fix - "if something already
+   answers on the port, reuse it" - made it worse: the next file connected to a
+   server that was in the middle of shutting down and hung for 279 s. Rejected
+   that approach. Now `scripts/test.js` starts ONE Postgres for the whole run
+   and passes `DATABASE_URL` to the test files, and startup removes a stale
+   `postmaster.pid` left by a killed run.
+4. *The router applied the login check too broadly.* The first version of
+   `routes/money.js` used `moneyRouter.use(requireLogin)` on a router mounted
+   at `/api`, which silently put a login check in front of every later `/api`
+   route. It happened to be harmless, but access control that works by accident
+   is the kind I cannot explain in an interview. Changed to `requireLogin` on
+   each of the three routes explicitly.
+
+**Commit:** _(fill in the hash of the "ledger engine" commit)_

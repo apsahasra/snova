@@ -3,6 +3,8 @@ import helmet from 'helmet';
 import { query } from './db.js';
 import { HttpError } from './errors.js';
 import { createAuthRouter } from './routes/auth.js';
+import { accountsRouter } from './routes/accounts.js';
+import { moneyRouter } from './routes/money.js';
 
 // Builds the Express app. Kept separate from server.js so the tests can start
 // the same app on a random port.
@@ -25,6 +27,9 @@ export function createApp(options = {}) {
   });
 
   app.use('/api/auth', createAuthRouter({ loginLimit: options.loginLimit }));
+
+  app.use('/api', moneyRouter);
+  app.use('/api/accounts', accountsRouter);
 
   // Unknown API route
   app.use('/api', (req, res) => {
