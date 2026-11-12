@@ -36,3 +36,42 @@ health endpoint and JSON error handling.
   deployed server), but it is not a stable release.
 
 **Commit:** _(fill in the hash of the "project skeleton" commit)_
+
+---
+
+## Entry 2 - 2026-11-12 - Login, sessions and role checks (authorisation)
+
+**What I asked for.** Authentication with three roles (admin, account holder,
+auditor), enforced on the server.
+
+**What the tool produced.** scrypt password hashing, random session tokens
+(only the SHA-256 is stored), a `requireLogin` middleware that re-reads the user
+and role from the database on every request, `requireRole(...)`, register /
+login / logout / me endpoints, and 8 tests.
+
+**What was wrong.**
+
+1. *The test command did not run at all.* The tool wrote
+   `"test": "node --test test/"` in `package.json`. On Node 24 this fails with
+   `Cannot find module '...\test'` - Node treats the folder as a file to run.
+   Zero tests executed, and the only signal was one line of red output. Fixed to
+   `node --test "test/*.test.js"` and raised `engines.node` to `>=22`, because
+   the glob form needs a recent Node.
+2. *The login rate limiter was hard-coded.* The first version created the
+   limiter (50 attempts / 15 min / IP) at module level. The test suite logs in
+   and registers far more than 50 times from one IP, so later tests would have
+   started failing with 429 for a reason unrelated to what they test. Changed
+   `authRouter` into `createAuthRouter({ loginLimit })` so production keeps 50
+   and the tests pass a high limit explicitly - instead of switching the limiter
+   off with a hidden `if (NODE_ENV === 'test')`.
+
+**Decisions I want to be able to defend.**
+
+- Opaque session tokens in the database instead of JWT: logout and
+  "deactivate user" take effect on the very next request, and there is no
+  signing secret to leak or algorithm to confuse.
+- Self-registration always creates a `holder`. The role is a literal in the
+  SQL, not read from the request body; there is a test that sends
+  `role: "admin"` and checks the stored role.
+
+**Commit:** _(fill in the hash of the "authentication" commit)_
