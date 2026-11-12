@@ -5,6 +5,7 @@ import { badRequest, forbidden, HttpError, notFound } from '../errors.js';
 import { requireLogin } from '../auth/middleware.js';
 import { canOpenAccountFor, canViewAccount } from '../policy.js';
 import { readId, readText } from '../validate.js';
+import { readLimit } from './audit.js';
 
 export const accountsRouter = Router();
 accountsRouter.use(requireLogin);
@@ -66,4 +67,29 @@ accountsRouter.get('/', async (req, res) => {
 accountsRouter.get('/:id', async (req, res) => {
   const account = await loadViewableAccount(req.user, readId(req.params.id));
   res.json({ account });
+});
+
+// GET /api/accounts/:id/statement?limit=100&before=<entry id>
+// Every debit, credit and refused attempt on the account, newest first, each
+// with the balance right after it and who initiated it.
+accountsRouter.get('/:id/statement', async (req, res) => {
+  const account = await loadViewableAccount(req.user, readId(req.params.id));
+  const limit = readLimit(req.query.limit);
+  const before = req.query.before === undefined ? null : readId(req.query.before, 'before');
+
+  const result = await query(
+    `SELECT e.id, e.created_at, e.direction, e.amount, e.status, e.balance_after,
+            t.id AS transaction_id, t.type, t.refusal_reason, t.memo,
+            u.username AS initiated_by,
+            CASE WHEN t.from_account_id = e.account_id THEN t.to_account_id ELSE t.from_account_id END
+              AS other_account_id
+       FROM entries e
+       JOIN transactions t ON t.id = e.transaction_id
+       JOIN users u ON u.id = t.initiated_by
+      WHERE e.account_id = $1 AND ($2::bigint IS NULL OR e.id < $2)
+      ORDER BY e.id DESC
+      LIMIT $3`,
+    [account.id, before, limit],
+  );
+  res.json({ account, entries: result.rows });
 });

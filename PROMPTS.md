@@ -128,3 +128,52 @@ lock or one check and re-run the tests. So that was done here, one at a time:
    each of the three routes explicitly.
 
 **Commit:** "Ledger engine: accounts, deposit/withdraw/transfer with row locks, policy module, race tests"
+
+---
+
+## Entry 4 - 2026-11-12 - Statements, tamper detection and the audit views (audit trail)
+
+**What I asked for.** A per-account statement, proof that the ledger is
+append-only, and what the admin and the auditor can see and do.
+
+**What the tool produced.** A statement endpoint, `src/ledger/verify.js`
+(recomputes conservation, double entry, every running balance and a
+per-account hash chain from the raw rows), admin endpoints (create user,
+freeze, adjustment with a mandatory reason), read-only audit endpoints, and
+12 more tests.
+
+**What was wrong.**
+
+1. *The new verify check exposed damage from my own earlier experiment, and
+   proved that an earlier test was too weak.* On its first run the "verify
+   passes on honest data" test failed: `account 1072: hash chain broken at
+   entry 375, 376, 378...`. Account 1072 belonged to a `race_...` test user
+   created at 08:16 UTC - during the Entry 3 run where `FOR UPDATE` had been
+   removed on purpose. Looking at the rows, entries 374/375/376 all had the
+   same `prev_hash`: three concurrent requests had each read the same "last
+   entry" and forked the chain. So the "20 simultaneous withdrawals" test that
+   *passed* without the lock in Entry 3 had in fact corrupted the ledger; it
+   just was not checking for it. Two fixes:
+   - `assertBooksBalance()` in the test helpers now runs the full
+     `verifyLedger()` (hash chains and running balances, not only sums).
+     Re-ran the no-lock mutation: **5 tests fail now, including the one that
+     used to pass.**
+   - `npm test` now deletes `.pgdata-test` and starts from an empty database,
+     so a deliberately broken run cannot leave bad rows for the next one. (I
+     did not "fix" the test by deleting the bad rows - they were real evidence.)
+2. *Leftover Postgres processes, root cause.* The half-dead `postgres.exe`
+   from Entry 3 came back. This time I looked at the process instead of
+   killing it: its command line was `--forkchild="io_worker"`, a Postgres 18
+   helper that survived its parent and kept the listening port open. The tool's
+   earlier fix (remove a stale `postmaster.pid`) could never have worked because
+   the pid file was already gone. Real fix: start the embedded server with
+   `io_method=sync`, which has no worker processes. Three clean runs in a row
+   afterwards.
+
+**Decision to defend.** The append-only triggers stop the application (and
+anyone using its database login through SQL) from changing a ledger row. They
+do not stop the database *owner*, who can disable a trigger. The hash chain is
+for that case: the test disables the trigger, edits an amount, and checks that
+`/api/audit/verify` reports the exact entry. It detects, it does not prevent.
+
+**Commit:** _(fill in the hash of the "statements and audit" commit)_

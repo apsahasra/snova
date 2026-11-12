@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { connect, disconnect, query } from '../src/db.js';
 import { migrate, seedUsers } from '../src/setup.js';
 import { createApp } from '../src/app.js';
+import { verifyLedger } from '../src/ledger/verify.js';
 
 export { query };
 
@@ -110,6 +111,11 @@ export async function balanceOf(accountId) {
 // The conservation invariant, checked straight from the database.
 // Throws if money has been created or destroyed anywhere.
 export async function assertBooksBalance() {
+  // The same full check the auditor runs: conservation, double entry, running
+  // balances and the per-account hash chains.
+  const report = await verifyLedger();
+  if (!report.ok) throw new Error(`ledger verification failed: ${report.problems.join('; ')}`);
+
   const total = await query('SELECT COALESCE(SUM(balance), 0)::bigint AS total FROM accounts');
   if (total.rows[0].total !== 0) throw new Error(`sum of all balances is ${total.rows[0].total}, expected 0`);
 

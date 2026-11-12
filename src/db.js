@@ -92,6 +92,9 @@ export async function resolveDatabaseUrl({ dataDir = '.pgdata', port = 54329 } =
     password: 'postgres',
     port,
     persistent: true,
+    // Postgres 18 starts "io_worker" helper processes. On Windows they can
+    // outlive a stopped server and keep the port busy; sync I/O has no workers.
+    postgresFlags: ['-c', 'io_method=sync'],
     onLog: () => {},
     onError: () => {},
   });

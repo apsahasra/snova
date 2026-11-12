@@ -5,6 +5,8 @@ import { HttpError } from './errors.js';
 import { createAuthRouter } from './routes/auth.js';
 import { accountsRouter } from './routes/accounts.js';
 import { moneyRouter } from './routes/money.js';
+import { adminRouter } from './routes/admin.js';
+import { auditRouter } from './routes/audit.js';
 
 // Builds the Express app. Kept separate from server.js so the tests can start
 // the same app on a random port.
@@ -30,6 +32,8 @@ export function createApp(options = {}) {
 
   app.use('/api', moneyRouter);
   app.use('/api/accounts', accountsRouter);
+  app.use('/api/admin', adminRouter);
+  app.use('/api/audit', auditRouter);
 
   // Unknown API route
   app.use('/api', (req, res) => {
