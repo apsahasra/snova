@@ -1,0 +1,15 @@
+# Render blueprint: one free web service. The database is a free Neon Postgres;
+# its connection string is entered in the Render dashboard (never committed).
+services:
+  - type: web
+    name: ledgerline
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
