@@ -1,9 +1,15 @@
 import { config } from './config.js';
 import { connect, disconnect, resolveDatabaseUrl, stopEmbedded } from './db.js';
 import { createApp } from './app.js';
+import { migrate, seedUsers } from './setup.js';
 
 const databaseUrl = await resolveDatabaseUrl();
 connect(databaseUrl);
+
+// Both are idempotent, so running them on every start is safe and means a
+// fresh database (clean clone, new deployment) needs no manual setup step.
+await migrate();
+await seedUsers();
 
 const app = createApp();
 const server = app.listen(config.port, () => {
