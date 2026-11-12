@@ -1,7 +1,7 @@
 import { config } from './config.js';
 import { connect, disconnect, resolveDatabaseUrl, stopEmbedded } from './db.js';
 import { createApp } from './app.js';
-import { migrate, seedUsers } from './setup.js';
+import { migrate, seedDemoAccounts, seedUsers } from './setup.js';
 
 const databaseUrl = await resolveDatabaseUrl();
 connect(databaseUrl);
@@ -10,6 +10,7 @@ connect(databaseUrl);
 // fresh database (clean clone, new deployment) needs no manual setup step.
 await migrate();
 await seedUsers();
+await seedDemoAccounts();
 
 const app = createApp();
 const server = app.listen(config.port, () => {

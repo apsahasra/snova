@@ -127,7 +127,7 @@ lock or one check and re-run the tests. So that was done here, one at a time:
    is the kind I cannot explain in an interview. Changed to `requireLogin` on
    each of the three routes explicitly.
 
-**Commit:** "Ledger engine: accounts, deposit/withdraw/transfer with row locks, policy module, race tests"
+**Commit:** "Ledger engine: accounts, deposit/withdraw/transfer with row locks, policy module, race tests
 
 ---
 
@@ -146,8 +146,7 @@ freeze, adjustment with a mandatory reason), read-only audit endpoints, and
 
 1. *The new verify check exposed damage from my own earlier experiment, and
    proved that an earlier test was too weak.* On its first run the "verify
-   passes on honest data" test failed: `account 1072: hash chain broken at
-   entry 375, 376, 378...`. Account 1072 belonged to a `race_...` test user
+   passes on honest data" test failed: `account 1072: hash chain broken at entry 375, 376, 378...`. Account 1072 belonged to a `race_...` test user
    created at 08:16 UTC - during the Entry 3 run where `FOR UPDATE` had been
    removed on purpose. Looking at the rows, entries 374/375/376 all had the
    same `prev_hash`: three concurrent requests had each read the same "last
@@ -176,4 +175,4 @@ do not stop the database *owner*, who can disable a trigger. The hash chain is
 for that case: the test disables the trigger, edits an amount, and checks that
 `/api/audit/verify` reports the exact entry. It detects, it does not prevent.
 
-**Commit:** _(fill in the hash of the "statements and audit" commit)_
+**Commit:** "Statements, ledger verification with hash chain, admin and auditor endpoints, tests"

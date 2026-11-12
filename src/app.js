@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import helmet from 'helmet';
 import { query } from './db.js';
@@ -22,6 +23,9 @@ export function createApp(options = {}) {
   // scripts and styles from our own origin (no inline scripts).
   app.use(helmet());
   app.use(express.json({ limit: '10kb' }));
+
+  // The web client: plain static files from ./public.
+  app.use(express.static(fileURLToPath(new URL('../public', import.meta.url))));
 
   app.get('/api/health', async (req, res) => {
     await query('SELECT 1');
